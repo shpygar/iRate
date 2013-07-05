@@ -33,6 +33,7 @@
 
 #import "iRate.h"
 #import <StoreKit/StoreKit.h>
+#import "MBProgressHUD.h"
 
 
 #import <Availability.h>
@@ -71,6 +72,7 @@ static NSString *const iRateMacAppStoreURLFormat = @"macappstore://itunes.apple.
 @property (nonatomic, strong) id visibleAlert;
 @property (nonatomic, assign) int previousOrientation;
 @property (nonatomic, assign) BOOL currentlyChecking;
+@property (nonatomic, assign) UIStatusBarStyle customStyle;
 
 @end
 
@@ -813,9 +815,21 @@ static NSString *const iRateMacAppStoreURLFormat = @"macappstore://itunes.apple.
         SKStoreProductViewController *productController = [[SKStoreProductViewController alloc] init];
         productController.delegate = (id<SKStoreProductViewControllerDelegate>)self;
         
+        MBProgressHUD *HUD = [[MBProgressHUD alloc] initWithView:[UIApplication sharedApplication].keyWindow];
+        [[UIApplication sharedApplication].keyWindow addSubview:HUD];
+        
+        // Set custom view mode
+        HUD.mode = MBProgressHUDModeIndeterminate;
+        ;
+        HUD.removeFromSuperViewOnHide = YES;
+        HUD.labelText = @"Loading";
+        
+        [HUD show:YES];
+        
         //load product details
         NSDictionary *productParameters = @{SKStoreProductParameterITunesItemIdentifier: [@(_appStoreID) description]};
         [productController loadProductWithParameters:productParameters completionBlock:^(BOOL result, NSError *error) {
+            [HUD hide:YES];
             
             if (!result)
             {
@@ -869,7 +883,10 @@ static NSString *const iRateMacAppStoreURLFormat = @"macappstore://itunes.apple.
             }
             
             //present product view controller
-            [rootViewController presentViewController:productController animated:YES completion:nil];
+            [rootViewController presentViewController:productController animated:YES completion:^{
+                _customStyle = [UIApplication sharedApplication].statusBarStyle;
+                [[UIApplication sharedApplication] setStatusBarStyle: UIStatusBarStyleBlackOpaque];
+            }];
             if ([self.delegate respondsToSelector:@selector(iRateDidPresentStoreKitModal)])
             {
                 [self.delegate iRateDidPresentStoreKitModal];
@@ -888,6 +905,8 @@ static NSString *const iRateMacAppStoreURLFormat = @"macappstore://itunes.apple.
 
 - (void)productViewControllerDidFinish:(SKStoreProductViewController *)controller
 {
+    [UIApplication sharedApplication].statusBarStyle = self.customStyle;
+    
     [controller.presentingViewController dismissViewControllerAnimated:YES completion:NULL];
     if ([self.delegate respondsToSelector:@selector(iRateDidDismissStoreKitModal)])
     {
